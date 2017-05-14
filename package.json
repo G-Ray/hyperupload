@@ -1,0 +1,30 @@
+{
+  "name": "hyperupload",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "discovery-swarm": "^4.3.7",
+    "hypercore": "^6.3.0",
+    "hyperdiscovery": "^6.0.2",
+    "random-access-memory": "^2.4.0"
+  },
+  "devDependencies": {
+    "standard": "^10.0.2",
+    "tape": "^4.6.3"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "standard && tape test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/G-Ray/hyperupload.git"
+  },
+  "author": "geoffrey bonneville",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/G-Ray/hyperupload/issues"
+  },
+  "homepage": "https://github.com/G-Ray/hyperupload#readme"
+}
