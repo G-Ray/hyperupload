@@ -1,17 +1,28 @@
 const swarm = require('discovery-swarm')
-const worker = require('./lib/worker')
+const hypercore = require('hypercore')
+const hyperdiscovery = require('hyperdiscovery')
+const ram = require('random-access-memory')
+// const worker = require('./lib/worker')
 
 module.exports = Hyperupload
 
-function Hyperupload (key) {
-  if (!(this instanceof Hyperupload)) return new Hyperupload(key)
+function Hyperupload (key, opts) {
+  if (!(this instanceof Hyperupload)) return new Hyperupload(key, opts)
 
   var self = this
 
+  if (!opts) opts = {}
+
   this.connections = [] // all connections in the hyperupload swarms
   this.sw = null
+  this.feedCreating = []
+  this.feeds = [] // pinned feeds
+  this.swarms = []
+  this.jobs = []
+  this.discoveryPort = opts.discoveryPort
 
   joinNetwork(key)
+  setInterval(() => this._processJobs(), 1000)
 
   function joinNetwork (key) {
     self.sw = swarm()
@@ -59,19 +70,21 @@ Hyperupload.prototype.upload = function (archive, cb) {
     uploaded[block] = false
   }
 
+  let i = 0
+
   for (let block = 0; block < archive.length; block++) {
     if (uploaded[block] === true) continue // already uploaded
 
-    let rand = Math.floor(Math.random() * (this.connections.length))
-    let connection = this.connections[rand]
-
+    let connection = this.connections[i]
     let blocks = { start: block, end: block + 1 }
     uploadBlocks(archive.key.toString('hex'), blocks, connection)
+
+    if (i < this.connections.length) i++
+    else i = 0
   }
 }
 
 function uploadBlocks (key, blocks, connection) {
-  console.log('uploadBlocks', blocks)
   let msg = { cmd: 'pin', key: key, blocks: blocks }
   connection.write(Buffer.from(JSON.stringify(msg) + '\n'))
 }
@@ -88,12 +101,58 @@ Hyperupload.prototype._processMsg = function (msg, connection) {
   switch (msg.cmd) {
     case 'pin':
       // console.log('received pin request!')
-      worker.pin(msg.key, msg.blocks)
+      this._pin(msg.key, msg.blocks)
       break
     default:
   }
 }
 
-Hyperupload.prototype.close = function () {
-  worker.closeAll()
+Hyperupload.prototype._processJobs = function () {
+  for (let j in this.jobs) {
+    let job = this.jobs[j]
+    if (this.feeds[job.key]) {
+      download(this.feeds[job.key], job.blocks)
+      delete this.jobs[j]
+    }
+  }
+
+  function download (feed, blocks) {
+    feed.download(blocks, (err, data) => {
+      if (err) return console.error(err)
+      console.log(feed.key.toString('hex'), 'blocks', blocks, 'downloaded')
+    })
+  }
+}
+
+Hyperupload.prototype._pin = function (key, blocks) {
+  this.jobs.push({key: key, blocks: blocks})
+
+  if (this.feeds[key] || this.feedCreating[key]) return // feed created or creating
+
+  this.createFeed(key)
+}
+
+Hyperupload.prototype.createFeed = function (key) {
+  this.feedCreating[key] = true
+
+  // create the feed before downloading blocks
+  let feed = hypercore((filename) => { return ram() }, key, {
+    sparse: true
+  })
+
+  feed.on('ready', (err) => {
+    if (err) throw err
+
+    // join swarm
+    let sw = hyperdiscovery(feed, { live: false, port: this.discoveryPort })
+
+    // add to created feeds
+    this.swarms[key] = sw
+    this.feeds[key] = feed
+    delete this.feedCreating[key]
+
+    sw.on('error', (err) => console.error(err))
+  })
+
+  feed.on('error', (err) => console.error(err))
 }
