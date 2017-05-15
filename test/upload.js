@@ -21,7 +21,6 @@ tape('upload an archive to hyperupload and download it', function (t) {
   feed.append('hello')
   feed.append('hyperupload', function (err) {
     if (err) throw err
-    feed.close()
 
     let key = feed.key
 

@@ -116,10 +116,12 @@ Hyperupload.prototype._processJobs = function () {
     }
   }
 
+  var nodeId = this.sw.id.toString('hex')
+
   function download (feed, blocks) {
     feed.download(blocks, (err, data) => {
       if (err) return console.error(err)
-      console.log(feed.key.toString('hex'), 'blocks', blocks, 'downloaded')
+      console.log(nodeId, 'downloaded blocks', blocks)
     })
   }
 }
